@@ -38,6 +38,17 @@ pub enum ProcMacroServerChoice {
     None,
 }
 
+/// Discovers, loads, and initializes a Rust project workspace at a specified root path, including running build scripts if configured.
+/// This is a high-level function that handles the full workflow from path resolution and manifest discovery to loading the workspace into the database.
+///
+/// # Arguments
+/// * `root` - The path to the root of the project to load.
+/// * `cargo_config` - Configuration settings related to Cargo, such as extra environment variables.
+/// * `load_config` - Configuration options for loading the workspace, including whether to load output directories from `cargo check` and proc macro server choices.
+/// * `progress` - A callback function to report loading progress updates.
+///
+/// # Returns
+/// A `Result` containing a tuple of the initialized `RootDatabase`, the `vfs::Vfs`, and an `Option<ProcMacroClient>` on success, or an `anyhow::Error` if any step of the loading process fails.
 pub fn load_workspace_at(
     root: &Path,
     cargo_config: &CargoConfig,
@@ -64,6 +75,17 @@ pub fn load_workspace_at(
     load_workspace(workspace, &cargo_config.extra_env, load_config)
 }
 
+/// Loads a `ProjectWorkspace` into a newly created `RootDatabase`, initializing the Virtual File System (VFS) and an optional proc macro server.
+/// It first creates a new `RootDatabase` and optionally configures its LRU cache capacity from the `RA_LRU_CAP` environment variable.
+/// The heavy lifting of loading the workspace into the database is delegated to `load_workspace_into_db`.
+///
+/// # Arguments
+/// * `ws` - The project workspace to load.
+/// * `extra_env` - Environment variables to pass to the proc macro server.
+/// * `load_config` - Configuration options for loading cargo projects.
+///
+/// # Returns
+/// A `Result` containing a tuple of the initialized `RootDatabase`, the `vfs::Vfs`, and an `Option<ProcMacroClient>` on success, or an `anyhow::Error` on failure.
 pub fn load_workspace(
     ws: ProjectWorkspace,
     extra_env: &FxHashMap<String, Option<String>>,
@@ -77,9 +99,17 @@ pub fn load_workspace(
     Ok((db, vfs, proc_macro_server))
 }
 
-// This variant of `load_workspace` allows deferring the loading of rust-analyzer
-// into an existing database, which is useful in certain third-party scenarios,
-// now that `salsa` supports extending foreign databases (e.g. `RootDatabase`).
+/// Loads a given `ProjectWorkspace` into an existing `RootDatabase` instance, deferring the database population.
+/// This function initializes the Virtual File System (VFS), sets up a proc macro server based on the provided configuration, and then populates the database with the crate graph and source root information.
+///
+/// # Arguments
+/// * `ws` - The project workspace to be loaded.
+/// * `extra_env` - A hash map of additional environment variables for the proc macro server.
+/// * `load_config` - Configuration options for loading cargo projects, including proc macro server choice and cache prefilling.
+/// * `db` - A mutable reference to the `RootDatabase` to load the workspace into.
+///
+/// # Returns
+/// A `Result` containing a tuple of the initialized `vfs::Vfs` and an `Option<ProcMacroClient>` if a proc macro server was successfully spawned, or an `anyhow::Error` on failure.
 pub fn load_workspace_into_db(
     ws: ProjectWorkspace,
     extra_env: &FxHashMap<String, Option<String>>,
@@ -355,8 +385,6 @@ impl SourceRootConfig {
             .collect()
     }
 
-    /// Maps local source roots to their parent source roots by bytewise comparing of root paths .
-    /// If a `SourceRoot` doesn't have a parent and is local then it is not contained in this mapping but it can be asserted that it is a root `SourceRoot`.
     pub fn source_root_parent_map(&self) -> FxHashMap<SourceRootId, SourceRootId> {
         let roots = self.fsc.roots();
 
